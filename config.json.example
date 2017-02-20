@@ -1,0 +1,13 @@
+"platform": "Particle",
+"name": "Particle Devices",
+"access_token": "XXXXX",
+"devices": [
+    {
+        "accessory": "GarageDoor",
+        "name": "Garage Door",
+        "deviceid": "XXXXX",
+        "type": "GARAGE_DOOR_OPENER",
+        "key": "door_status",
+        "event_name": "door/status"
+    }
+]

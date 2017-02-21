@@ -3,8 +3,6 @@ var rp = require("request-promise");
 var util = require("util");
 var Service, Characteristic, DoorState;
 
-var uuid = homebridge.hap.uuid;
-
 module.exports = function(homebridge) {
   Service = homebridge.hap.Service;
   Characteristic = homebridge.hap.Characteristic;
@@ -33,11 +31,13 @@ GarageSentry.prototype = {
 function GarageSentryAccessory(log, url, access_token, device_id) {
   this.log = log;
   this.name = 'Garage Door';
-  
+  this.access_token = access_token;
+  this.base_url = 
   this.api_options = {
     method: 'GET',
-    uri: [url, 'devices', device_id].join('/'),
-    headers: {'Authorization': util.format('Bearer %s', access_token)}
+    baseUrl: [url, 'devices', device_id].join('/'),
+    headers: {'Authorization': util.format('Bearer %s', access_token)},
+    json: true
   };
   
   this.poll_rate = 2000;
@@ -72,41 +72,26 @@ GarageSentryAccessory.prototype = {
         
         that.currentDoorState.setValue(is_closed ? DoorState.CLOSED : DoorState.OPEN);
         that.targetDoorState.setValue(is_closed ? DoorState.CLOSED : DoorState.OPEN);
-      })
-      .fail(function(error) {
-        that.log("Failed on checkDeviceState.  Setting closed.");
-        that.currentDoorState.setValue(DoorState.CLOSED);
-        that.targetDoorState.setValue(DoorState.CLOSED);
       });
     
     setTimeout(this.monitorState.bind(this), this.poll_rate);
   },
     
-  particle_request: function(method, uri) {
-    var options = util._extend({method: method}, this.api_options);
-    options.uri += uri;
+  checkDeviceState: function() {
+    var that = this;
+    var options = util._extend({}, this.api_options);
+    options.method = 'get';
+    options.uri = 'door_status';
     
     return rp(options)
-             .then(function(parsedBody) {
-               var body = JSON.parse(parsedBody);
-               this.token = body.access_token;
-               return body;
-             }.bind(this));
-  },
-    
-  checkDeviceState: function() {
-    device_state = particle_request('get', 'door_status')
       .then(function(response) {
-        
-        var state = response.result;
-        return (state === 'Door Closed') ? true : false;
+        return (response.result === 'Door Closed') ? true : false;
       })
-      .fail(function(error) {
+      .catch(function(error) {
         that.log("Failed on checkDeviceState promise.  Resolving true.");
+        that.log(error);
         return true;
       });
-      
-    return Promise.fromCallback(device_state);
   },
     
   getTargetState: function(callback) {
@@ -131,10 +116,8 @@ GarageSentryAccessory.prototype = {
         }
 
         that.operating = false;
-      })
-      .fail(function(error) {
-        that.log("Failed in setFinalDoorState.");
       });
+
   },
     
   getState: function(callback) {
@@ -147,7 +130,7 @@ GarageSentryAccessory.prototype = {
 
         callback(null, state);
       })
-      .fail(function(error) {
+      .catch(function(error) {
         that.log("Failed in getState.  Setting closed.");
         callback(null, DoorState.CLOSED);
       });
@@ -155,6 +138,7 @@ GarageSentryAccessory.prototype = {
     
   setState: function(state, callback) {
     var that = this;
+    var the_callback = callback;
     
     this.checkDeviceState()
       .then(function(is_closed) {
@@ -169,13 +153,18 @@ GarageSentryAccessory.prototype = {
           }
           
           setTimeout(that.setFinalDoorState.bind(that), that.door_timeout);
-          //that.particle_request('post', 'door_toggle');
+          var options = util._extend({}, that.api_options);
+          options.method = 'post';
+          options.uri = 'door_toggle';
+          
+          rp(options)
+            .then(function(response) {
+              return the_callback();
+            });
         }
-        
-        callback();
-        return true;
+
       })
-      .fail(function(error) {
+      .catch(function(error) {
         that.log("Failed on setState.");
         callback();
       });

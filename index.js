@@ -1,5 +1,5 @@
-var q = require("q");
-var request = require("request");
+var Promise = require("bluebird");
+var rp = require("request-promise");
 var util = require("util");
 var Service, Characteristic, DoorState;
 
@@ -33,10 +33,13 @@ GarageSentry.prototype = {
 function GarageSentryAccessory(log, url, access_token, device_id) {
   this.log = log;
   this.name = 'Garage Door';
-  this.device_id = device_id;
-  this.url = [url, 'devices', this.device_id].join('/');
-  this.access_token = access_token;
-
+  
+  this.api_options = {
+    method: 'GET',
+    uri: [url, 'devices', device_id].join('/'),
+    headers: {'Authorization': util.format('Bearer %s', access_token)}
+  };
+  
   this.poll_rate = 2000;
   this.door_timeout = 6000;
   this.initService();
@@ -80,43 +83,30 @@ GarageSentryAccessory.prototype = {
   },
     
   particle_request: function(method, uri) {
-    var deferred = q.defer();
-    var options = {
-      url: [this.url, uri].join('/'),
-      headers: {'Authorization': util.format('Bearer %s', this.access_token)}
-    };
+    var options = util._extend({method: method}, this.api_options);
+    options.uri += uri;
     
-    function response(error, response, body) {
-      if (error) {
-        deferred.reject(false);
-      } else {
-        deferred.resolve(JSON.parse(body));
-      }
-    }
-    
-    if (method === 'get') {
-      request.get(options, response);
-    } else if (method === 'post') {
-      request.post(options, response);
-    }
-    
-    return deferred.promise;
+    return rp(options)
+             .then(function(parsedBody) {
+               var body = JSON.parse(parsedBody);
+               this.token = body.access_token;
+               return body;
+             }.bind(this));
   },
     
   checkDeviceState: function() {
-    var deferred = q.defer();
-
-    this.particle_request('get', 'door_status')
+    device_state = particle_request('get', 'door_status')
       .then(function(response) {
+        
         var state = response.result;
-        deferred.resolve((state === 'Door Closed') ? true : false);
+        return (state === 'Door Closed') ? true : false;
       })
       .fail(function(error) {
         that.log("Failed on checkDeviceState promise.  Resolving true.");
-        deferred.resolve(true);
+        return true;
       });
       
-    return deferred.promise;
+    return Promise.fromCallback(device_state);
   },
     
   getTargetState: function(callback) {

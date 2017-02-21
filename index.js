@@ -1,16 +1,15 @@
-var types = require("hap-nodejs/accessories/types.js");
-var uuid = require("hap-nodejs/lib/util/uuid.js");
 var q = require("q");
 var request = require("request");
 var util = require("util");
 var Service, Characteristic, DoorState;
 
+var uuid = homebridge.hap.uuid;
 
 module.exports = function(homebridge) {
   Service = homebridge.hap.Service;
   Characteristic = homebridge.hap.Characteristic;
   DoorState = homebridge.hap.Characteristic.CurrentDoorState;
-
+  uuid = homebridge.hap.uuid;
   homebridge.registerPlatform("homebridge-garage-sentry", "Garage Sentry", GarageSentry);
 };
 
@@ -53,7 +52,7 @@ GarageSentryAccessory.prototype = {
       .setCharacteristic(Characteristic.Model, 'Garage Door')
       .setCharacteristic(Characteristic.SerialNumber, this.device_id);
         
-    this.service = new Service.GarageDoorOpener(this.name, uuid.generate('hap-nodejs:accessories:garage_door'));
+    this.service = new Service.GarageDoorOpener(this.name, uuid.generate('garage-sentry:garage_door'));
 
     this.operating = false;
 

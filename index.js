@@ -89,7 +89,6 @@ GarageSentryAccessory.prototype = {
       })
       .catch(function(error) {
         that.log("Failed on checkDeviceState promise.  Resolving true.");
-        that.log(error);
         return true;
       });
   },

@@ -17,7 +17,7 @@ function GarageSentry(log, config) {
   
   this.access_token = config.access_token;
   this.device_id = config.device_id;
-  this.url = config.url || 'https://api.spark.io/v1';
+  this.url = config.url || 'https://api.particle.io/v1';
 }
 
 GarageSentry.prototype = {
